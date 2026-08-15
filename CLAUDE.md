@@ -21,7 +21,9 @@ disponibilité de marque/store.
 - **Paiement** : RevenueCat + Apple/Google IAP (pas Stripe — contenu digital
   consommé in-app)
 - **Vision LLM** : Gemini 3.1 Flash-Lite via l'API Google Generative
-  Language. **Ne pas utiliser Gemini 2.5 Flash-Lite** (déprécié le
+  Language. Identifiant confirmé en appel réel : `gemini-3.1-flash-lite`
+  (surchargeable sans redéploiement via le secret `GEMINI_MODEL`).
+  **Ne pas utiliser Gemini 2.5 Flash-Lite** (déprécié le
   16 octobre 2026). **DeepSeek exclu** : son API publique est text-only,
   pas de vision exposée malgré le "Vision Mode" de leur app grand public.
 
