@@ -6,7 +6,7 @@ type Style = (typeof STYLES)[number];
 // Le modèle est surchargeable par env : l'identifiant exact de Gemini 3.1
 // Flash-Lite doit être confirmé côté console Google avant la mise en prod.
 const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-3.1-flash-lite";
-const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY")!;
+const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 
 // ~7,5 Mo de base64 ≈ 5,6 Mo d'image brute. Au-delà, l'appel Gemini échouerait
 // de toute façon : autant refuser tôt et ne rien facturer.
@@ -70,6 +70,12 @@ function json(body: unknown, status = 200) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
+
+  // Sans clé, l'appel Gemini partirait quand même et renverrait un 502 opaque.
+  if (!GEMINI_API_KEY) {
+    console.error("GEMINI_API_KEY is not set");
+    return json({ error: "misconfigured" }, 500);
+  }
 
   // 1. Authentifier via JWT
   const authHeader = req.headers.get("Authorization") ?? "";

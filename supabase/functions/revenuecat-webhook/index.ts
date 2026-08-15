@@ -3,7 +3,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 // Secret partagé configuré côté dashboard RevenueCat (header Authorization).
 // Ce n'est PAS un JWT Supabase : verify_jwt est désactivé pour cette fonction
 // dans supabase/config.toml.
-const WEBHOOK_SECRET = Deno.env.get("REVENUECAT_WEBHOOK_SECRET")!;
+const WEBHOOK_SECRET = Deno.env.get("REVENUECAT_WEBHOOK_SECRET");
 
 const ACTIVE_EVENTS = new Set([
   "INITIAL_PURCHASE",
@@ -29,6 +29,9 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 /** Comparaison à temps constant : évite de fuiter le secret octet par octet. */
 function secretMatches(provided: string): boolean {
+  // Fail closed : sans secret configuré, tout doit être rejeté. Sinon un
+  // appelant envoyant la chaîne littérale "undefined" passerait.
+  if (!WEBHOOK_SECRET) return false;
   const a = new TextEncoder().encode(provided);
   const b = new TextEncoder().encode(WEBHOOK_SECRET);
   if (a.length !== b.length) return false;
