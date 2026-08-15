@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 
 import { PrimaryButton, Screen, Wordmark } from '../components/ui';
+import { identify } from '../lib/purchases';
 import { supabase } from '../lib/supabase';
 import { colors, font, radius, space } from '../theme/tokens';
 
@@ -43,6 +44,7 @@ export default function SignIn() {
       setMode('sign-in');
       return;
     }
+    await identify(data.session.user.id);
     router.replace('/home');
   }
 
