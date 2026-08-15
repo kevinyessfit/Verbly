@@ -320,10 +320,16 @@ element — no stock-photo people, keep it abstract/typographic.
 
 ## TODO restant
 
-- [ ] Écran paywall (3 cartes de prix, design + logique de sélection)
-- [ ] UI principale : image picker + sélecteur de style + affichage des
+- [x] Écran paywall (3 cartes de prix, design + logique de sélection)
+- [x] UI principale : image picker + sélecteur de style + affichage des
       3 suggestions + bouton copier/régénérer
+- [x] SDK RevenueCat intégré + `Purchases.logIn(supabaseUserId)` au login
 - [ ] Créer les produits IAP dans App Store Connect / Play Console
 - [ ] Config Offering "default" dans RevenueCat avec les 3 Packages
+- [ ] Poser `REVENUECAT_WEBHOOK_SECRET` (Supabase secrets + dashboard
+      RevenueCat) — le webhook rejette tout tant qu'il est absent
+- [ ] Renseigner `EXPO_PUBLIC_REVENUECAT_IOS_KEY` / `_ANDROID_KEY` dans `.env`
+- [ ] Build natif (dev client / EAS) : RevenueCat ne tourne pas dans Expo Go
+- [ ] Sign in with Apple (obligatoire sur iOS, pas encore implémenté)
 - [ ] Rédiger la privacy policy réelle
 - [ ] Tester le flow webhook de bout en bout (achat sandbox → sync Supabase)
