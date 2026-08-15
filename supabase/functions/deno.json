@@ -1,0 +1,4 @@
+{
+  "//": "Les Edge Functions tournent sous Deno, pas sous Node : sans ceci, deno check résout les imports dans le node_modules de l'app Expo et échoue.",
+  "nodeModulesDir": "none"
+}

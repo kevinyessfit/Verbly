@@ -18,7 +18,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "gen:types": "supabase gen types typescript --linked > types/supabase.ts"
+    "gen:types": "supabase gen types typescript --linked > types/supabase.ts",
+    "check:functions": "deno check -c supabase/functions/deno.json supabase/functions/*/index.ts"
   },
   "private": true
 }

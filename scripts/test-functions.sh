@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+# Tests manuels des Edge Functions Verbly.
+#
+#   cp .env.test.local.example .env.test.local   # puis remplis-le
+#   export TOKEN=$(./scripts/test-functions.sh token)
+#   ./scripts/test-functions.sh gen ./capture.png
+#   ./scripts/test-functions.sh gen ./capture.png joueur
+#   ./scripts/test-functions.sh quota ./capture.png   # boucle jusqu'au 402
+#   ./scripts/test-functions.sh webhook INITIAL_PURCHASE
+#   ./scripts/test-functions.sh webhook EXPIRATION
+#   ./scripts/test-functions.sh webhook-bad-secret    # doit renvoyer 401
+#
+# Chaque commande imprime le corps de la réponse puis le code HTTP.
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+if [ -f .env.test.local ]; then set -a; . ./.env.test.local; set +a; fi
+
+: "${SUPABASE_URL:?SUPABASE_URL manquant (https://<ref>.supabase.co)}"
+: "${SUPABASE_ANON_KEY:?SUPABASE_ANON_KEY manquant}"
+
+FUNCTIONS="$SUPABASE_URL/functions/v1"
+
+b64() { base64 -w0 "$1" 2>/dev/null || base64 "$1" | tr -d '\n'; }
+
+# Échange email/mot de passe contre un JWT. Le compte doit exister dans le
+# projet Supabase (Auth > Users > Add user).
+get_token() {
+  curl -sS -X POST "$SUPABASE_URL/auth/v1/token?grant_type=password" \
+    -H "apikey: $SUPABASE_ANON_KEY" \
+    -H "Content-Type: application/json" \
+    -d "{\"email\":\"${TEST_USER_EMAIL:?}\",\"password\":\"${TEST_USER_PASSWORD:?}\"}" \
+    | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p'
+}
+
+call_gen() {
+  local img="$1" style="${2:-charmeur}" mime="image/png"
+  if [ -z "${TOKEN:-}" ]; then
+    echo 'TOKEN vide. Lance: export TOKEN=$(./scripts/test-functions.sh token)' >&2
+    exit 1
+  fi
+  [ -f "$img" ] || { echo "image introuvable: $img" >&2; exit 1; }
+  case "$img" in *.jpg|*.jpeg) mime="image/jpeg" ;; esac
+
+  {
+    printf '{"image":"'
+    b64 "$img"
+    printf '","mimeType":"%s","style":"%s"}' "$mime" "$style"
+  } | curl -sS -o /dev/stderr -w '\nHTTP %{http_code}\n' \
+        -X POST "$FUNCTIONS/generate-replies" \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        --data-binary @-
+}
+
+webhook_event() {
+  local type="$1" secret="$2" exp
+  exp=$(( ($(date +%s) + 604800) * 1000 ))   # expiration dans 7 jours
+  curl -sS -o /dev/stderr -w '\nHTTP %{http_code}\n' \
+    -X POST "$FUNCTIONS/revenuecat-webhook" \
+    -H "Authorization: $secret" \
+    -H "Content-Type: application/json" \
+    -d "{\"api_version\":\"1.0\",\"event\":{\"type\":\"$type\",\"app_user_id\":\"${TEST_USER_ID:?}\",\"entitlement_ids\":[\"pro\"],\"store\":\"APP_STORE\",\"expiration_at_ms\":$exp}}"
+}
+
+case "${1:-}" in
+  token)
+    get_token
+    ;;
+  gen)
+    call_gen "${2:?chemin de la capture requis}" "${3:-charmeur}"
+    ;;
+  quota)
+    # 3 générations gratuites : la 4e doit répondre 402 {"paywall":true}
+    for i in 1 2 3 4; do
+      echo "--- appel $i ---" >&2
+      call_gen "${2:?chemin de la capture requis}"
+    done
+    ;;
+  webhook)
+    webhook_event "${2:-INITIAL_PURCHASE}" "${REVENUECAT_WEBHOOK_SECRET:?}"
+    ;;
+  webhook-bad-secret)
+    webhook_event INITIAL_PURCHASE "mauvais-secret"
+    ;;
+  *)
+    sed -n '2,13p' "$0"
+    exit 1
+    ;;
+esac
