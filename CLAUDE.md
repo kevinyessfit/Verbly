@@ -192,6 +192,14 @@ Ordre d'exécution strict :
 Le `402 Payment Required` est le signal que l'app doit intercepter pour
 ouvrir le paywall RevenueCat.
 
+Deux cas limites tranchés sur les crédits :
+- `conversation_detected: false` est quand même loggué dans `generations`,
+  donc une image qui n'est pas une capture de chat consomme un essai gratuit.
+- Si l'insert dans `generations` échoue après un appel Gemini réussi, les
+  suggestions sont renvoyées quand même et l'erreur est loggée : ce crédit
+  n'est pas décompté. Une panne d'écriture ne doit pas être payée par
+  l'utilisateur.
+
 ### `revenuecat-webhook`
 
 - Authentifié par un secret partagé (header `Authorization`, PAS un JWT
