@@ -200,7 +200,10 @@ ouvrir le paywall RevenueCat.
   `Purchases.logIn(supabaseUserId)` côté app au login
 - `INITIAL_PURCHASE` / `RENEWAL` / `PRODUCT_CHANGE` / `UNCANCELLATION` →
   `status: active`
-- `EXPIRATION` / `CANCELLATION` / `BILLING_ISSUE` → `status: expired`
+- `EXPIRATION` / `BILLING_ISSUE` → `status: expired`
+- `CANCELLATION` → ignoré (acquitté en 200, aucune écriture) : c'est l'arrêt du
+  renouvellement automatique, pas la fin de l'accès. L'utilisateur garde la
+  période payée, `EXPIRATION` arrive à `current_period_end`.
 - `upsert` sur `subscriptions` avec `onConflict: user_id` (un seul row
   d'abonnement courant par utilisateur)
 - Retourner `500` en cas d'erreur d'écriture pour que RevenueCat retente

@@ -8,6 +8,7 @@
 #   ./scripts/test-functions.sh quota ./capture.png   # boucle jusqu'au 402
 #   ./scripts/test-functions.sh webhook INITIAL_PURCHASE
 #   ./scripts/test-functions.sh webhook EXPIRATION
+#   ./scripts/test-functions.sh webhook CANCELLATION  # doit répondre {"ignored":...}
 #   ./scripts/test-functions.sh webhook-bad-secret    # doit renvoyer 401
 #
 # Chaque commande imprime le corps de la réponse puis le code HTTP.
@@ -84,7 +85,7 @@ case "${1:-}" in
     webhook_event INITIAL_PURCHASE "mauvais-secret"
     ;;
   *)
-    sed -n '2,13p' "$0"
+    sed -n '2,14p' "$0"
     exit 1
     ;;
 esac

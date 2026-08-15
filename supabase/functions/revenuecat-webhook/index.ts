@@ -11,9 +11,11 @@ const ACTIVE_EVENTS = new Set([
   "PRODUCT_CHANGE",
   "UNCANCELLATION",
 ]);
+// CANCELLATION n'est volontairement pas là : chez RevenueCat il signale l'arrêt
+// du renouvellement automatique, pas la fin de l'accès. L'utilisateur garde ce
+// qu'il a payé jusqu'à expiration_at_ms, et EXPIRATION arrive à ce moment-là.
 const EXPIRED_EVENTS = new Set([
   "EXPIRATION",
-  "CANCELLATION",
   "BILLING_ISSUE",
 ]);
 
@@ -63,8 +65,8 @@ Deno.serve(async (req) => {
   let status: string;
   if (ACTIVE_EVENTS.has(type)) status = "active";
   else if (EXPIRED_EVENTS.has(type)) status = "expired";
-  // TEST, TRANSFER, SUBSCRIBER_ALIAS... : rien à écrire, mais on acquitte en 200
-  // pour que RevenueCat ne retente pas indéfiniment.
+  // CANCELLATION, TEST, TRANSFER, SUBSCRIBER_ALIAS... : rien à écrire, mais on
+  // acquitte en 200 pour que RevenueCat ne retente pas indéfiniment.
   else return json({ ignored: type }, 200);
 
   // app_user_id doit être l'id Supabase (Purchases.logIn(supabaseUserId) côté
