@@ -1,18 +1,29 @@
-import { Link } from 'expo-router';
-import { Text, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Redirect } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { View } from 'react-native';
 
-import { screen } from '../theme/placeholder';
+import { supabase } from '../lib/supabase';
+import { colors } from '../theme/tokens';
 
-// Écran d'accueil / upload. Placeholder : les liens servent à vérifier que
-// la navigation fonctionne, ils sauteront avec les maquettes Stitch.
-export default function Home() {
-  return (
-    <View style={screen.container}>
-      <Text style={screen.title}>home / upload</Text>
-      <Link href="/onboarding" style={screen.link}>→ onboarding</Link>
-      <Link href="/sign-in" style={screen.link}>→ sign-in</Link>
-      <Link href="/results" style={screen.link}>→ results</Link>
-      <Link href="/paywall" style={screen.link}>→ paywall</Link>
-    </View>
-  );
+export const ONBOARDING_SEEN_KEY = 'verbly.onboarding.seen';
+
+/** Aiguillage au démarrage : onboarding une seule fois, puis auth, puis upload. */
+export default function Gate() {
+  const [route, setRoute] = useState<'/onboarding' | '/sign-in' | '/home' | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const [seen, { data }] = await Promise.all([
+        AsyncStorage.getItem(ONBOARDING_SEEN_KEY),
+        supabase.auth.getSession(),
+      ]);
+      if (!seen) setRoute('/onboarding');
+      else if (!data.session) setRoute('/sign-in');
+      else setRoute('/home');
+    })();
+  }, []);
+
+  if (!route) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
+  return <Redirect href={route} />;
 }

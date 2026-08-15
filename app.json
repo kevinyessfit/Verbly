@@ -22,7 +22,13 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Verbly needs access to your photos so you can upload a screenshot of your conversation."
+        }
+      ]
     ],
     "scheme": "verbly"
   }
