@@ -63,14 +63,14 @@ export default function Home() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.headline}>Never be at a loss for words.</Text>
+        <Text style={styles.headline}>Ne sèche plus jamais.</Text>
         <Text style={styles.sub}>
-          Upload a screenshot of your chat and we'll handle the heavy lifting.
+          Envoie une capture de ta conversation, on s'occupe du reste.
         </Text>
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Upload a chat screenshot"
+          accessibilityLabel="Envoyer une capture de conversation"
           onPress={pick}
           style={({ pressed }) => [styles.dropzone, pressed && styles.dropzonePressed]}
         >
@@ -81,19 +81,19 @@ export default function Home() {
               <View style={styles.uploadBadge}>
                 <Text style={styles.uploadGlyph}>↑</Text>
               </View>
-              <Text style={styles.dropTitle}>Drop Screenshot Here</Text>
-              <Text style={styles.dropHint}>or tap to browse files</Text>
+              <Text style={styles.dropTitle}>Dépose ta capture ici</Text>
+              <Text style={styles.dropHint}>ou appuie pour choisir un fichier</Text>
             </View>
           )}
         </Pressable>
 
         {uri ? (
           <Pressable onPress={pick}>
-            <Text style={styles.replace}>Choose another screenshot</Text>
+            <Text style={styles.replace}>Choisir une autre capture</Text>
           </Pressable>
         ) : null}
 
-        <Text style={styles.sectionLabel}>PICK YOUR PLAY</Text>
+        <Text style={styles.sectionLabel}>CHOISIS TON STYLE</Text>
         <View style={styles.pills}>
           {STYLES.map(({ id, label }) => {
             const active = id === style;
@@ -114,7 +114,7 @@ export default function Home() {
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <PrimaryButton
-          label="Generate replies"
+          label="Générer les réponses"
           onPress={generate}
           loading={busy}
           disabled={!uri}

@@ -3,9 +3,9 @@ import { SUPABASE_URL, supabase } from './supabase';
 export type Style = 'charmeur' | 'direct' | 'joueur';
 
 export const STYLES: { id: Style; label: string }[] = [
-  { id: 'charmeur', label: 'Charming' },
+  { id: 'charmeur', label: 'Charmeur' },
   { id: 'direct', label: 'Direct' },
-  { id: 'joueur', label: 'Playful' },
+  { id: 'joueur', label: 'Joueur' },
 ];
 
 /**

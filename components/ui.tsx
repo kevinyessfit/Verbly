@@ -12,8 +12,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, font, radius, space } from '../theme/tokens';
 
+/**
+ * Conteneur d'écran. Le contenu est borné à une largeur de téléphone et centré :
+ * sur le web desktop, sans cette borne, les écrans s'étirent sur toute la
+ * fenêtre et la mise en page conçue pour du mobile s'effondre.
+ */
 export function Screen({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
-  return <SafeAreaView style={[styles.screen, style]}>{children}</SafeAreaView>;
+  return (
+    <SafeAreaView style={styles.screen}>
+      <View style={[styles.inner, style]}>{children}</View>
+    </SafeAreaView>
+  );
 }
 
 /** Signature de marque : le mot-symbole ambre avec son étincelle. */
@@ -66,6 +75,12 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.bg,
+    alignItems: 'center',
+  },
+  inner: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 480,
   },
   wordmark: {
     flexDirection: 'row',

@@ -44,24 +44,24 @@ export default function Results() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.sectionLabel}>CONTEXT</Text>
+        <Text style={styles.sectionLabel}>CONTEXTE</Text>
         <View style={styles.context}>
           {current.uri ? (
             <Image source={{ uri: current.uri }} style={styles.thumb} resizeMode="cover" />
           ) : null}
           <View style={styles.contextText}>
-            <Text style={styles.contextTitle}>Your screenshot</Text>
-            <Text style={styles.contextTone}>Tone: {styleLabel}</Text>
+            <Text style={styles.contextTitle}>Ta capture</Text>
+            <Text style={styles.contextTone}>Style : {styleLabel}</Text>
           </View>
         </View>
 
         {!detected ? (
           <Text style={styles.notice}>
-            We couldn't find a conversation in this screenshot. Try another one for sharper replies.
+            Aucune conversation détectée dans cette capture. Essaie-en une autre pour des réponses plus justes.
           </Text>
         ) : null}
 
-        <Text style={styles.headline}>Suggested Replies</Text>
+        <Text style={styles.headline}>Réponses suggérées</Text>
 
         {suggestions.map((text, i) => (
           <SuggestionCard key={`${pass}-${i}`} text={text} index={i} />
@@ -70,12 +70,12 @@ export default function Results() {
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <PrimaryButton
-          label="Generate More Options"
+          label="Générer d'autres réponses"
           onPress={regenerate}
           loading={busy}
           style={styles.cta}
         />
-        <Text style={styles.footnote}>Tap a reply to copy it to your clipboard.</Text>
+        <Text style={styles.footnote}>Appuie sur une réponse pour la copier.</Text>
       </ScrollView>
     </Screen>
   );
@@ -115,7 +115,7 @@ function SuggestionCard({ text, index }: { text: string; index: number }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Copy reply: ${text}`}
+      accessibilityLabel={`Copier la réponse : ${text}`}
       onPress={copy}
       onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
@@ -124,7 +124,7 @@ function SuggestionCard({ text, index }: { text: string; index: number }) {
 
       <View style={styles.cardFooter}>
         <Text style={[styles.copyLabel, copied && styles.copyLabelDone]}>
-          {copied ? 'Copied' : 'Copy'}
+          {copied ? 'Copié' : 'Copier'}
         </Text>
       </View>
 

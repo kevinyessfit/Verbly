@@ -10,19 +10,19 @@ import { ONBOARDING_SEEN_KEY } from './index';
 
 const STEPS = [
   {
-    headline: 'Stop Overthinking.',
-    body: 'Upload a screenshot of any chat and let our AI find the perfect words to keep the spark alive.',
-    cta: 'Next',
+    headline: 'Arrête de te prendre la tête.',
+    body: "Envoie une capture de n'importe quelle conversation, l'IA trouve les mots justes pour garder l'étincelle.",
+    cta: 'Suivant',
   },
   {
-    headline: 'Pick Your Play.',
-    body: "Choose between Charming, Direct, or Playful tones to match your vibe and the conversation's energy.",
-    cta: 'Next',
+    headline: 'Choisis ton style.',
+    body: "Charmeur, Direct ou Joueur : le ton qui te ressemble et qui colle à l'énergie de la conversation.",
+    cta: 'Suivant',
   },
   {
-    headline: 'Copy. Paste. Connect.',
-    body: 'Get three sharp suggestions instantly and move the conversation forward with confidence.',
-    cta: 'Get Started',
+    headline: 'Copie. Colle. Connecte.',
+    body: 'Trois réponses affûtées en un instant, pour relancer la conversation avec assurance.',
+    cta: 'Commencer',
   },
 ];
 

@@ -39,7 +39,7 @@ export default function SignIn() {
     // Sur inscription, le projet peut exiger une confirmation par email :
     // dans ce cas il n'y a pas encore de session.
     if (!data.session) {
-      setMessage('Check your inbox to confirm your address, then sign in.');
+      setMessage('Confirme ton adresse depuis ta boîte mail, puis connecte-toi.');
       setMode('sign-in');
       return;
     }
@@ -58,12 +58,12 @@ export default function SignIn() {
 
         <View style={styles.form}>
           <Text style={styles.headline}>
-            {mode === 'sign-in' ? 'Welcome back.' : 'Create your account.'}
+            {mode === 'sign-in' ? 'Content de te revoir.' : 'Crée ton compte.'}
           </Text>
 
           <TextInput
             style={styles.input}
-            placeholder="Email"
+            placeholder="Adresse email"
             placeholderTextColor={colors.textMuted}
             autoCapitalize="none"
             autoComplete="email"
@@ -73,7 +73,7 @@ export default function SignIn() {
           />
           <TextInput
             style={styles.input}
-            placeholder="Password"
+            placeholder="Mot de passe"
             placeholderTextColor={colors.textMuted}
             autoCapitalize="none"
             secureTextEntry
@@ -84,7 +84,7 @@ export default function SignIn() {
           {message ? <Text style={styles.message}>{message}</Text> : null}
 
           <PrimaryButton
-            label={mode === 'sign-in' ? 'Sign in' : 'Sign up'}
+            label={mode === 'sign-in' ? 'Se connecter' : "S'inscrire"}
             onPress={submit}
             loading={busy}
             disabled={!email.trim() || password.length < 6}
@@ -92,7 +92,7 @@ export default function SignIn() {
 
           <Pressable onPress={() => setMode(mode === 'sign-in' ? 'sign-up' : 'sign-in')}>
             <Text style={styles.switch}>
-              {mode === 'sign-in' ? 'No account yet? Sign up' : 'Already registered? Sign in'}
+              {mode === 'sign-in' ? 'Pas encore de compte ? Inscris-toi' : 'Déjà inscrit ? Connecte-toi'}
             </Text>
           </Pressable>
         </View>
