@@ -5,11 +5,10 @@
 #   export TOKEN=$(./scripts/test-functions.sh token)
 #   ./scripts/test-functions.sh gen ./capture.png
 #   ./scripts/test-functions.sh gen ./capture.png joueur
-#   ./scripts/test-functions.sh quota ./capture.png   # boucle jusqu'au 402
-#   ./scripts/test-functions.sh webhook INITIAL_PURCHASE
-#   ./scripts/test-functions.sh webhook EXPIRATION
-#   ./scripts/test-functions.sh webhook CANCELLATION  # doit répondre {"ignored":...}
-#   ./scripts/test-functions.sh webhook-bad-secret    # doit renvoyer 401
+#   ./scripts/test-functions.sh quota ./capture.png       # boucle jusqu'au 402
+#   ./scripts/test-functions.sh pay month 97000000        # renvoie une reference
+#   ./scripts/test-functions.sh confirm <reference>       # crédite le pass
+#   ./scripts/test-functions.sh confirm-bad <reference>   # doit renvoyer 401
 #
 # Chaque commande imprime le corps de la réponse puis le code HTTP.
 set -euo pipefail
@@ -24,6 +23,15 @@ FUNCTIONS="$SUPABASE_URL/functions/v1"
 
 b64() { base64 -w0 "$1" 2>/dev/null || base64 "$1" | tr -d '\n'; }
 
+post() {
+  # post <fonction> <valeur du header Authorization> <corps json>
+  curl -sS -o /dev/stderr -w '\nHTTP %{http_code}\n' \
+    -X POST "$FUNCTIONS/$1" \
+    -H "Authorization: $2" \
+    -H "Content-Type: application/json" \
+    -d "$3"
+}
+
 # Échange email/mot de passe contre un JWT. Le compte doit exister dans le
 # projet Supabase (Auth > Users > Add user).
 get_token() {
@@ -34,12 +42,16 @@ get_token() {
     | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p'
 }
 
-call_gen() {
-  local img="$1" style="${2:-charmeur}" mime="image/png"
+need_token() {
   if [ -z "${TOKEN:-}" ]; then
     echo 'TOKEN vide. Lance: export TOKEN=$(./scripts/test-functions.sh token)' >&2
     exit 1
   fi
+}
+
+call_gen() {
+  local img="$1" style="${2:-charmeur}" mime="image/png"
+  need_token
   [ -f "$img" ] || { echo "image introuvable: $img" >&2; exit 1; }
   case "$img" in *.jpg|*.jpeg) mime="image/jpeg" ;; esac
 
@@ -52,16 +64,6 @@ call_gen() {
         -H "Authorization: Bearer $TOKEN" \
         -H "Content-Type: application/json" \
         --data-binary @-
-}
-
-webhook_event() {
-  local type="$1" secret="$2" exp
-  exp=$(( ($(date +%s) + 604800) * 1000 ))   # expiration dans 7 jours
-  curl -sS -o /dev/stderr -w '\nHTTP %{http_code}\n' \
-    -X POST "$FUNCTIONS/revenuecat-webhook" \
-    -H "Authorization: $secret" \
-    -H "Content-Type: application/json" \
-    -d "{\"api_version\":\"1.0\",\"event\":{\"type\":\"$type\",\"app_user_id\":\"${TEST_USER_ID:?}\",\"entitlement_ids\":[\"pro\"],\"store\":\"APP_STORE\",\"expiration_at_ms\":$exp}}"
 }
 
 case "${1:-}" in
@@ -78,11 +80,18 @@ case "${1:-}" in
       call_gen "${2:?chemin de la capture requis}"
     done
     ;;
-  webhook)
-    webhook_event "${2:-INITIAL_PURCHASE}" "${REVENUECAT_WEBHOOK_SECRET:?}"
+  pay)
+    need_token
+    post create-payment "Bearer $TOKEN" \
+      "{\"pass\":\"${2:-month}\",\"phone\":\"${3:-97000000}\"}"
     ;;
-  webhook-bad-secret)
-    webhook_event INITIAL_PURCHASE "mauvais-secret"
+  confirm)
+    post payment-webhook "${PAYMENT_WEBHOOK_SECRET:?}" \
+      "{\"reference\":\"${2:?reference requise}\",\"status\":\"succeeded\",\"channel\":\"MTN\"}"
+    ;;
+  confirm-bad)
+    post payment-webhook "mauvais-secret" \
+      "{\"reference\":\"${2:?reference requise}\",\"status\":\"succeeded\"}"
     ;;
   *)
     sed -n '2,14p' "$0"

@@ -413,7 +413,8 @@ enabled = true
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
 
-# Le webhook RevenueCat s'authentifie par un secret partagé dans le header
-# Authorization, pas par un JWT Supabase.
-[functions.revenuecat-webhook]
+
+# Le webhook de l'agrégateur mobile money s'authentifie par un secret partagé
+# dans le header Authorization, pas par un JWT Supabase.
+[functions.payment-webhook]
 verify_jwt = false

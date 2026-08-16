@@ -3,7 +3,6 @@ import { Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 
-import { identify } from '../lib/purchases';
 import { supabase } from '../lib/supabase';
 import { colors } from '../theme/tokens';
 
@@ -19,10 +18,6 @@ export default function Gate() {
         AsyncStorage.getItem(ONBOARDING_SEEN_KEY),
         supabase.auth.getSession(),
       ]);
-      // RevenueCat doit connaître l'id Supabase avant tout achat, sinon ses
-      // events arrivent au webhook avec un app_user_id anonyme.
-      if (data.session) void identify(data.session.user.id);
-
       if (!seen) setRoute('/onboarding');
       else if (!data.session) setRoute('/sign-in');
       else setRoute('/home');

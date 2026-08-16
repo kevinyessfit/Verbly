@@ -1,104 +1,48 @@
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { PrimaryButton, Screen, Wordmark } from '../components/ui';
-import {
-  getOffering,
-  purchase,
-  purchasesAvailable,
-  restore,
-  type PurchasesPackage,
-} from '../lib/purchases';
+import { PASSES, createPayment, formatXof, waitForAccess, type PassType } from '../lib/payments';
 import { colors, font, radius, space } from '../theme/tokens';
 
-type Plan = {
-  id: string;
-  name: string;
-  price: string;
-  period: string;
-  note?: string;
-  best?: boolean;
-  pkg?: PurchasesPackage;
-};
-
-/** Ordre d'affichage de la maquette : l'annuel au milieu, mis en avant. */
-const ORDER = ['WEEKLY', 'ANNUAL', 'MONTHLY'];
-
-const PERIOD_LABEL: Record<string, string> = {
-  WEEKLY: '/week',
-  ANNUAL: '/year',
-  MONTHLY: '/month',
-};
-
-// Repli quand RevenueCat n'est pas joignable (Expo Go, ou Offering non
-// configuré). Ces prix sont indicatifs : Apple exige ceux du store.
-const FALLBACK: Plan[] = [
-  { id: 'WEEKLY', name: 'WEEKLY', price: '$6.99', period: '/week' },
-  { id: 'ANNUAL', name: 'ANNUAL', price: '$59.99', period: '/year', note: 'Approx $4.99/month', best: true },
-  { id: 'MONTHLY', name: 'MONTHLY', price: '$19.99', period: '/month' },
-];
+type Phase = 'choose' | 'waiting' | 'done';
 
 export default function Paywall() {
-  const [plans, setPlans] = useState<Plan[]>(FALLBACK);
-  const [live, setLive] = useState(false);
-  const [selected, setSelected] = useState('ANNUAL');
+  const [selected, setSelected] = useState<PassType>('month');
+  const [phone, setPhone] = useState('');
+  const [phase, setPhase] = useState<Phase>('choose');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const router = useRouter();
 
-  useEffect(() => {
-    (async () => {
-      const offering = await getOffering();
-      if (!offering) return;
-
-      const mapped = offering.availablePackages
-        .filter((p) => ORDER.includes(p.packageType))
-        .sort((a, b) => ORDER.indexOf(a.packageType) - ORDER.indexOf(b.packageType))
-        .map<Plan>((p) => ({
-          id: p.identifier,
-          name: p.packageType,
-          price: p.product.priceString,
-          period: PERIOD_LABEL[p.packageType] ?? '',
-          best: p.packageType === 'ANNUAL',
-          pkg: p,
-        }));
-
-      if (!mapped.length) return;
-      setPlans(mapped);
-      setLive(true);
-      setSelected(mapped.find((p) => p.best)?.id ?? mapped[0].id);
-    })();
-  }, []);
-
-  async function confirm() {
-    const plan = plans.find((p) => p.id === selected);
-    if (!plan?.pkg) {
-      setMessage('Subscriptions are not available in this build yet.');
-      return;
-    }
+  async function pay() {
     setBusy(true);
     setMessage(null);
-    const outcome = await purchase(plan.pkg);
-    setBusy(false);
 
-    if (outcome.status === 'purchased') {
-      // Le webhook RevenueCat met Supabase à jour de son côté ; le quota est
-      // relu au prochain appel de generate-replies.
-      router.back();
+    const created = await createPayment(selected, phone);
+    if (!created.ok) {
+      setBusy(false);
+      setMessage(created.error);
       return;
     }
-    if (outcome.status === 'error') setMessage(outcome.message);
-  }
 
-  async function onRestore() {
-    setBusy(true);
-    setMessage(null);
-    const outcome = await restore();
+    setPhase('waiting');
+    setMessage(created.instructions);
+    if (created.checkoutUrl) void Linking.openURL(created.checkoutUrl);
+
+    // Le pass n'est crédité qu'une fois le webhook de l'agrégateur reçu :
+    // on attend que la base le reflète plutôt que de croire le client.
+    const granted = await waitForAccess();
     setBusy(false);
-    setMessage(
-      outcome.status === 'purchased' ? 'Purchases restored.' : 'Nothing to restore.',
-    );
+
+    if (granted) {
+      setPhase('done');
+      setMessage('Paiement confirmé. Ton accès est actif.');
+      return;
+    }
+    setPhase('choose');
+    setMessage("Paiement non confirmé. Si tu as validé sur ton téléphone, l'accès s'activera d'ici peu.");
   }
 
   return (
@@ -108,39 +52,35 @@ export default function Paywall() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.headline}>Get Unlimited Plays</Text>
+        <Text style={styles.headline}>Réponses illimitées</Text>
         <Text style={styles.sub}>
-          Never be at a loss for words again. Unlock the ultimate conversational advantage.
+          Tes 3 essais gratuits sont épuisés. Prends un pass et continue sans compter.
         </Text>
 
         <View style={styles.plans}>
-          {plans.map((plan) => {
-            const active = plan.id === selected;
+          {PASSES.map((pass) => {
+            const active = pass.id === selected;
             return (
               <Pressable
-                key={plan.id}
+                key={pass.id}
                 accessibilityRole="radio"
                 accessibilityState={{ selected: active }}
-                accessibilityLabel={`${plan.name} ${plan.price}${plan.period}`}
-                onPress={() => setSelected(plan.id)}
+                accessibilityLabel={`${pass.name} ${formatXof(pass.amountXof)}`}
+                onPress={() => setSelected(pass.id)}
+                disabled={phase === 'waiting'}
                 style={[styles.plan, active && styles.planActive]}
               >
-                {plan.best ? (
+                {pass.best ? (
                   <View style={styles.badge}>
-                    <Text style={styles.badgeText}>BEST VALUE</Text>
+                    <Text style={styles.badgeText}>MEILLEURE OFFRE</Text>
                   </View>
                 ) : null}
 
                 <View style={styles.planBody}>
                   <View style={styles.planText}>
-                    <Text style={[styles.planName, active && styles.planNameActive]}>
-                      {plan.name}
-                    </Text>
-                    <Text style={styles.planPrice}>
-                      {plan.price}
-                      <Text style={styles.planPeriod}>{plan.period}</Text>
-                    </Text>
-                    {plan.note ? <Text style={styles.planNote}>{plan.note}</Text> : null}
+                    <Text style={[styles.planName, active && styles.planNameActive]}>{pass.name}</Text>
+                    <Text style={styles.planPrice}>{formatXof(pass.amountXof)}</Text>
+                    {pass.note ? <Text style={styles.planNote}>{pass.note}</Text> : null}
                   </View>
 
                   <View style={[styles.radio, active && styles.radioActive]}>
@@ -152,29 +92,36 @@ export default function Paywall() {
           })}
         </View>
 
+        <Text style={styles.fieldLabel}>NUMÉRO MOBILE MONEY</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Ex. 97000000"
+          placeholderTextColor={colors.textMuted}
+          keyboardType="phone-pad"
+          autoComplete="tel"
+          value={phone}
+          onChangeText={setPhone}
+          editable={phase !== 'waiting'}
+        />
+
         {message ? <Text style={styles.message}>{message}</Text> : null}
 
-        <PrimaryButton label="Continue" onPress={confirm} loading={busy} style={styles.cta} />
+        {phase === 'done' ? (
+          <PrimaryButton label="Continuer" onPress={() => router.back()} style={styles.cta} />
+        ) : (
+          <PrimaryButton
+            label={phase === 'waiting' ? 'En attente de confirmation…' : 'Payer'}
+            onPress={pay}
+            loading={busy}
+            disabled={phone.trim().length < 8}
+            style={styles.cta}
+          />
+        )}
 
         <Text style={styles.legal}>
-          Cancel anytime. Billing recurs at the frequency shown above until cancelled.
+          Paiement unique, sans renouvellement automatique. L'accès expire à la fin de la durée
+          choisie.
         </Text>
-
-        {!live ? (
-          <Text style={styles.legal}>
-            Showing indicative prices — store pricing loads in a native build.
-          </Text>
-        ) : null}
-
-        <View style={styles.links}>
-          <Pressable onPress={onRestore} disabled={!purchasesAvailable}>
-            <Text style={styles.link}>Restore Purchases</Text>
-          </Pressable>
-          <Text style={styles.dot}>•</Text>
-          <Text style={styles.link}>Terms</Text>
-          <Text style={styles.dot}>•</Text>
-          <Text style={styles.link}>Privacy</Text>
-        </View>
       </ScrollView>
     </Screen>
   );
@@ -261,11 +208,6 @@ const styles = StyleSheet.create({
     fontSize: 30,
     letterSpacing: -0.5,
   },
-  planPeriod: {
-    color: colors.textMuted,
-    fontFamily: font.body,
-    fontSize: 16,
-  },
   planNote: {
     color: colors.coral,
     fontFamily: font.body,
@@ -289,14 +231,33 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     backgroundColor: colors.amber,
   },
+  fieldLabel: {
+    color: colors.textMuted,
+    fontFamily: font.bodySemi,
+    fontSize: 12,
+    letterSpacing: 1.2,
+    marginTop: space.md,
+  },
+  input: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.outline,
+    paddingHorizontal: space.md,
+    paddingVertical: space.md,
+    color: colors.text,
+    fontFamily: font.body,
+    fontSize: 16,
+  },
   message: {
-    color: colors.coral,
+    color: colors.textMuted,
     fontFamily: font.body,
     fontSize: 14,
+    lineHeight: 20,
     textAlign: 'center',
   },
   cta: {
-    marginTop: space.lg,
+    marginTop: space.sm,
   },
   legal: {
     color: colors.textMuted,
@@ -304,20 +265,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     textAlign: 'center',
-  },
-  links: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: space.sm,
-  },
-  link: {
-    color: colors.textMuted,
-    fontFamily: font.bodySemi,
-    fontSize: 12,
-  },
-  dot: {
-    color: colors.outline,
-    fontSize: 12,
   },
 });

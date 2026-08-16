@@ -2,11 +2,16 @@
 
 ## Vue d'ensemble
 
-**Verbly** — app mobile qui analyse une capture d'écran de conversation
+**Verbly** — app web mobile qui analyse une capture d'écran de conversation
 (dating apps, messageries) et génère 3 suggestions de réponse selon un
-style choisi par l'utilisateur. Marché : global/international. Stratégie
-de lancement : cloner le concept dominant du marché (Rizz, W Rizz,
-Tchatch...), itérer ensuite sur la différenciation.
+style choisi par l'utilisateur. Marché : Afrique de l'Ouest francophone,
+paiement en mobile money. Stratégie de lancement : cloner le concept
+dominant du marché (Rizz, W Rizz, Tchatch...), itérer ensuite sur la
+différenciation.
+
+Note de positionnement : sur ce marché l'usage dominant est WhatsApp et
+Instagram DM plutôt que les apps de rencontre. Le prompt couvre déjà
+« dating apps, messageries » ; le vocabulaire produit reste à revoir.
 
 Nom choisi après vérification que l'espace de nommage évident (wing/rizz/
 flirt/spark/charm/smooth + variantes) est déjà saturé de clones quasi
@@ -18,8 +23,16 @@ disponibilité de marque/store.
 
 - **Frontend** : Expo + TypeScript (React Native) — même approche que Mangi
 - **Backend/DB** : Supabase (Postgres, Auth, Edge Functions)
-- **Paiement** : RevenueCat + Apple/Google IAP (pas Stripe — contenu digital
-  consommé in-app)
+- **Distribution** : web mobile d'abord, pas de store. Ni Apple ni Google ne
+  permettent d'encaisser en mobile money via leur facturation in-app, donc le
+  store est incompatible avec le moyen de paiement du marché visé.
+- **Paiement** : mobile money (MTN, Moov, Celtiis) via un agrégateur, non
+  encore choisi (KkiaPay / FedaPay / CinetPay). Le code parle à une interface
+  `Provider` dans `supabase/functions/_shared/providers.ts` ; brancher un
+  agrégateur = écrire un adaptateur. Un adaptateur `stub` permet de tester le
+  flux complet sans compte marchand.
+- **Pas d'abonnement auto-renouvelé** : le mobile money ne fait pas de
+  prélèvement récurrent fiable. Le modèle est le **pass prépayé**.
 - **Vision LLM** : Gemini 3.1 Flash-Lite via l'API Google Generative
   Language. Identifiant confirmé en appel réel : `gemini-3.1-flash-lite`
   (surchargeable sans redéploiement via le secret `GEMINI_MODEL`).
@@ -108,7 +121,7 @@ create table public.profiles (
   created_at timestamptz default now()
 );
 
--- SUBSCRIPTIONS (écrite uniquement par le webhook RevenueCat, service_role)
+-- SUBSCRIPTIONS (écrite uniquement par payment-webhook, service_role)
 create table public.subscriptions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles(id) on delete cascade,
@@ -192,7 +205,7 @@ Ordre d'exécution strict :
    ne doit jamais coûter un crédit d'essai à l'utilisateur
 
 Le `402 Payment Required` est le signal que l'app doit intercepter pour
-ouvrir le paywall RevenueCat.
+ouvrir le paywall.
 
 Deux cas limites tranchés sur les crédits :
 - `conversation_detected: false` est quand même loggué dans `generations`,
@@ -202,47 +215,66 @@ Deux cas limites tranchés sur les crédits :
   n'est pas décompté. Une panne d'écriture ne doit pas être payée par
   l'utilisateur.
 
-### `revenuecat-webhook`
+### `create-payment`
 
-- Authentifié par un secret partagé (header `Authorization`, PAS un JWT
-  Supabase — configuré côté dashboard RevenueCat)
-- `app_user_id` de l'event RevenueCat = `id` Supabase — **nécessite**
-  `Purchases.logIn(supabaseUserId)` côté app au login
-- `INITIAL_PURCHASE` / `RENEWAL` / `PRODUCT_CHANGE` / `UNCANCELLATION` →
-  `status: active`
-- `EXPIRATION` / `BILLING_ISSUE` → `status: expired`
-- `CANCELLATION` → ignoré (acquitté en 200, aucune écriture) : c'est l'arrêt du
-  renouvellement automatique, pas la fin de l'accès. L'utilisateur garde la
-  période payée, `EXPIRATION` arrive à `current_period_end`.
-- `upsert` sur `subscriptions` avec `onConflict: user_id` (un seul row
-  d'abonnement courant par utilisateur)
-- Retourner `500` en cas d'erreur d'écriture pour que RevenueCat retente
+1. Authentifier via JWT
+2. Valider le pass demandé (`day` / `week` / `month`) et le numéro
+3. Écrire une ligne `payments` en `pending` **avant** de contacter
+   l'agrégateur — si l'appel échoue à mi-chemin, la référence existe déjà et
+   le webhook pourra la retrouver
+4. Appeler `provider.initiate()` et renvoyer la référence + les consignes
+
+Le client n'envoie **jamais** de montant : il choisit un identifiant de pass,
+le prix vient du catalogue serveur (`_shared/passes.ts`).
+
+### `payment-webhook`
+
+- `verify_jwt = false` : l'agrégateur n'a pas de JWT Supabase. Authentifié
+  par secret partagé (`PAYMENT_WEBHOOK_SECRET`), comparaison à temps constant,
+  **fail closed** si le secret n'est pas configuré.
+- Idempotence à deux niveaux : contrainte unique `(provider, provider_ref)` en
+  base, et le passage `pending → succeeded` est conditionné à
+  `.eq('status', 'pending')` pour que deux webhooks simultanés ne créditent
+  pas deux pass.
+- Succès → `grant_pass()`, qui **prolonge** `current_period_end` au lieu de
+  l'écraser (acheter un pass en cours de période cumule).
+- Référence inconnue → `200 {ignored}` (un rejeu n'y changerait rien).
+- Échec du grant après encaissement → la ligne repasse `pending` et on renvoie
+  `500` pour que l'agrégateur retente.
 
 ## Monétisation
 
-Un seul entitlement RevenueCat (`pro`), trois fréquences de facturation
-sur le même palier de fonctionnalités — pattern dominant du marché :
+Pass prépayés, pas d'abonnement : le mobile money ne sait pas prélever
+automatiquement. L'utilisateur achète une durée d'accès et repaie s'il veut
+prolonger.
 
-| Formule | Prix indicatif | Essai |
+| Pass | Prix | Rôle |
 |---|---|---|
-| Hebdo | $4.99–$6.99/semaine | 3 jours |
-| Mensuel | $14.99–$19.99/mois | 7 jours |
-| Annuel | $59.99–$79.99/an | — (à mettre en avant comme "meilleure offre") |
+| 24 heures | 200 FCFA | Prix d'entrée, achat impulsif |
+| 7 jours | 1 000 FCFA | Le volume |
+| 30 jours | 3 000 FCFA | Mis en avant comme « meilleure offre » |
 
-Essai gratuit hors abonnement : 3 générations à vie (voir
-`get_remaining_quota`), pas un quota récurrent.
+Prix ancrés sur les forfaits data mobiles, pas sur des données de marché :
+à valider en conditions réelles. Les changer est trivial (catalogue serveur),
+et sans renouvellement automatique il n'y a aucun abonné historique à migrer.
 
-## Conformité store (à traiter avant soumission)
+Il n'y a **pas** de pass annuel : payé d'avance en FCFA sur un marché à
+renouvellement manuel, il ne se vendrait pas.
+
+Essai gratuit : 3 générations à vie (voir `get_remaining_quota`), pas un
+quota récurrent.
+
+## Conformité
+
+Plus de revue Apple/Google : le web supprime le risque de rejet « wrapper
+autour d'une API IA », le classement 17+ et le contrôle sur le pattern
+d'abonnement. Restent :
 
 - Privacy policy explicite sur le traitement d'images contenant des
   données d'un tiers (l'interlocuteur dans la capture) — pas juste
   l'utilisateur. Préciser : images traitées mais non stockées.
-- Classement d'âge probable 17+ (contenu dating/suggestif)
-- Prix et fréquence de facturation visibles **avant** confirmation d'achat
-  dans le paywall — point de contrôle strict d'Apple sur ce pattern
-  hebdo + essai court
-- Ne pas présenter l'app comme un simple wrapper autour d'une API IA dans
-  la description store — Apple rejette facilement ce type de listing
+- Prix et durée visibles **avant** confirmation de paiement.
+- Mentions légales de l'entité qui encaisse, exigées par l'agrégateur.
 
 ## Identité visuelle (direction donnée à Google Stitch)
 
@@ -323,13 +355,18 @@ element — no stock-photo people, keep it abstract/typographic.
 - [x] Écran paywall (3 cartes de prix, design + logique de sélection)
 - [x] UI principale : image picker + sélecteur de style + affichage des
       3 suggestions + bouton copier/régénérer
-- [x] SDK RevenueCat intégré + `Purchases.logIn(supabaseUserId)` au login
-- [ ] Créer les produits IAP dans App Store Connect / Play Console
-- [ ] Config Offering "default" dans RevenueCat avec les 3 Packages
-- [ ] Poser `REVENUECAT_WEBHOOK_SECRET` (Supabase secrets + dashboard
-      RevenueCat) — le webhook rejette tout tant qu'il est absent
-- [ ] Renseigner `EXPO_PUBLIC_REVENUECAT_IOS_KEY` / `_ANDROID_KEY` dans `.env`
-- [ ] Build natif (dev client / EAS) : RevenueCat ne tourne pas dans Expo Go
-- [ ] Sign in with Apple (obligatoire sur iOS, pas encore implémenté)
+- [x] Passage aux pass mobile money : migration, `grant_pass`, table
+      `payments`, `create-payment` + `payment-webhook`, paywall en FCFA
+- [x] Flux de paiement testé de bout en bout avec l'adaptateur `stub`
+      (402 → paiement → pass crédité → génération à nouveau autorisée)
+- [x] Cible web ajoutée (`react-native-web`), bundle web vérifié
+- [ ] Choisir l'agrégateur et écrire son adaptateur dans `_shared/providers.ts`
+- [ ] Ouvrir le compte marchand (entité légale + vérification) — chemin
+      critique, plusieurs semaines, à lancer en parallèle du code
+- [ ] Régénérer `PAYMENT_WEBHOOK_SECRET` avant la production : celui en place
+      a servi aux tests
+- [ ] Rendre les écrans responsives pour le web (pensés pour du mobile natif)
+- [ ] Héberger le web et brancher un nom de domaine
 - [ ] Rédiger la privacy policy réelle
-- [ ] Tester le flow webhook de bout en bout (achat sandbox → sync Supabase)
+- [ ] Décider du sort de la confirmation d'email Supabase (active aujourd'hui,
+      SMTP intégré non fiable)

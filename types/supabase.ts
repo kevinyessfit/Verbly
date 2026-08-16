@@ -74,6 +74,50 @@ export type Database = {
           },
         ]
       }
+      payments: {
+        Row: {
+          amount_xof: number
+          created_at: string | null
+          id: string
+          pass_type: string
+          provider: string
+          provider_ref: string
+          status: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          amount_xof: number
+          created_at?: string | null
+          id?: string
+          pass_type: string
+          provider: string
+          provider_ref: string
+          status: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          amount_xof?: number
+          created_at?: string | null
+          id?: string
+          pass_type?: string
+          provider?: string
+          provider_ref?: string
+          status?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string | null
@@ -97,7 +141,7 @@ export type Database = {
           created_at: string | null
           current_period_end: string | null
           id: string
-          revenuecat_entitlement: string | null
+          pass_type: string | null
           status: string
           store: string | null
           updated_at: string | null
@@ -107,7 +151,7 @@ export type Database = {
           created_at?: string | null
           current_period_end?: string | null
           id?: string
-          revenuecat_entitlement?: string | null
+          pass_type?: string | null
           status: string
           store?: string | null
           updated_at?: string | null
@@ -117,7 +161,7 @@ export type Database = {
           created_at?: string | null
           current_period_end?: string | null
           id?: string
-          revenuecat_entitlement?: string | null
+          pass_type?: string | null
           status?: string
           store?: string | null
           updated_at?: string | null
@@ -139,6 +183,10 @@ export type Database = {
     }
     Functions: {
       get_remaining_quota: { Args: { p_user_id: string }; Returns: number }
+      grant_pass: {
+        Args: { p_pass_type: string; p_store?: string; p_user_id: string }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never
