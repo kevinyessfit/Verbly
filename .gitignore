@@ -44,3 +44,6 @@ yarn-error.*
 # deno.lock at the root is a byproduct of running deno from the repo root;
 # the Edge Functions keep their own under supabase/functions/
 /deno.lock
+
+# vercel
+.vercel
